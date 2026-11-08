@@ -6,6 +6,7 @@ rem OmniRoute gateway (from C:\Users\tokki\.config\opencode\opencode.jsonc) — 
 set OPENAI_API_KEY=sk-4effa4a5a0a15633-dc1977-018e0f83
 set UA_PROVIDER=openai
 set UA_BASE_URL=http://127.0.0.1:20128/v1
-set UA_MODEL=auto/coding
+set UA_MODEL=auto/best-chat
+set UA_BROWSER_MODEL=typhoon/typhoon-v2.5-30b-a3b-instruct
 set UA_CODE_CMD=claude -p
 python -m unified_agent.cli %*

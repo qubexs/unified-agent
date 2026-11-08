@@ -31,6 +31,7 @@ class Settings:
     provider: str = "echo"  # anthropic | openai | echo
     model: str = ""
     base_url: str | None = None  # OpenAI-compatible servers: Ollama, vLLM, ...
+    browser_model: str = ""  # separate model for browser-use (auto/* routers are flaky for structured steps)
     # Storage
     home: Path = field(default_factory=lambda: DEFAULT_HOME)
     user_id: str = "default_user"
@@ -69,6 +70,7 @@ class Settings:
         return {
             "provider": self.provider,
             "model": self.model,
+            "browser_model": self.browser_model,
             "base_url": self.base_url,
             "home": str(self.home),
             "user_id": self.user_id,
@@ -100,6 +102,7 @@ class Settings:
         return cls(
             provider=data.get("provider", "echo"),
             model=data.get("model", ""),
+            browser_model=data.get("browser_model", ""),
             base_url=data.get("base_url") or None,
             home=_path(data.get("home")) or DEFAULT_HOME,
             user_id=data.get("user_id", "default_user"),
@@ -158,6 +161,10 @@ class Settings:
         }
         settings.provider = provider
         settings.model = env.get("UA_MODEL", settings.model or default_models.get(provider, ""))
+        settings.browser_model = env.get("UA_BROWSER_MODEL", getattr(settings, "browser_model", "") or "")
+        # Default browser model to direct typhoon (stable via OmniRoute) if not set
+        if not settings.browser_model and settings.base_url and "20128" in str(settings.base_url):
+            settings.browser_model = "typhoon/typhoon-v2.5-30b-a3b-instruct"
         settings.base_url = env.get("UA_BASE_URL", settings.base_url or "") or None
         settings.home = Path(env.get("UA_HOME", settings.home))
         settings.user_id = env.get("UA_USER_ID", settings.user_id)

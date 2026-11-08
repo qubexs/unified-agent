@@ -20,21 +20,61 @@ def run_browser_task(task: str, settings: Settings) -> str:
     except ImportError as e:
         raise ToolUnavailable("Browser tool needs: pip install 'unified-agent[browser]'") from e
 
+    # Use separate browser model if configured (auto/* routers are non-deterministic and
+    # cause sporadic 404 model_not_found on structured steps like step 2+)
+    model = (getattr(settings, "browser_model", "") or settings.model)
+
     if settings.provider == "anthropic":
         from browser_use import ChatAnthropic  # type: ignore
 
-        llm = ChatAnthropic(model=settings.model)
+        llm = ChatAnthropic(model=model)
     elif settings.provider == "openai":
         from browser_use import ChatOpenAI  # type: ignore
 
-        llm = ChatOpenAI(model=settings.model)
+        # OmniRoute (and other OpenAI-compatible gateways) may not support strict
+        # structured output; disable it so browser-use falls back to plain JSON.
+        # See: ChatOpenAI(..., dont_force_structured_output=True, add_schema_to_system_prompt=True)
+        kwargs = {
+            "model": model,
+            "dont_force_structured_output": True,
+            "add_schema_to_system_prompt": True,
+        }
+        if settings.base_url:
+            kwargs["base_url"] = settings.base_url
+        import os
+
+        api_key = os.environ.get("OPENAI_API_KEY") or "not-needed"
+        if settings.base_url:
+            kwargs["api_key"] = api_key
+        try:
+            llm = ChatOpenAI(**kwargs)
+        except TypeError:
+            try:
+                llm = ChatOpenAI(model=model)
+            except Exception as e2:
+                raise ToolUnavailable(f"ChatOpenAI init failed: {e2}") from e2
     else:
         raise ToolUnavailable("Browser tool needs an Anthropic or OpenAI model configured.")
 
     async def _run() -> str:
-        agent = Agent(task=task, llm=llm, browser=Browser())
+        browser = Browser()  # BrowserSession in newer browser-use
+        agent = Agent(task=task, llm=llm, browser=browser, max_failures=3)
         history = await agent.run()
-        return history.final_result() or "(browser agent finished without a result)"
+        # On browser-use failures (e.g., gateway 404 model_not_found), include history for debugging
+        res = history.final_result()
+        if res:
+            return res
+        # Summarize last error from history for visibility instead of empty result
+        try:
+            if history.history:
+                last = history.history[-1]
+                if last.result:
+                    for r in last.result:
+                        if getattr(r, "error", None):
+                            return f"(browser agent error: {r.error})"
+        except Exception:
+            pass
+        return "(browser agent finished without a result)"
 
     return asyncio.run(_run())
 

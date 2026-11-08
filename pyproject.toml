@@ -19,7 +19,7 @@ dependencies = [
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.40"]
 memory = ["mem0ai>=0.1"]
-browser = ["browser-use", "playwright"]
+browser = ["browser-use>=0.11", "playwright", "pydantic-settings>=2.0"]
 desktop = ["pywebview>=5"]
 outlines = ["outlines", "transformers", "torch"]
 dev = ["pytest>=8", "httpx>=0.27", "python-multipart"]
