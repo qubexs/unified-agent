@@ -17,24 +17,45 @@
   select, input[type=text], button { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
   button { cursor:pointer; background:var(--accent); color:#fff; border-color:var(--accent); }
   button:disabled { opacity:.5; cursor:default; }
+  button.toggle { background:var(--card); color:var(--fg); border:1px solid var(--line); }
   label { color:var(--muted); font-size:13px; display:flex; align-items:center; gap:6px; }
   .shell { flex:1; display:grid; grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr); min-height:0; }
-  main { overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; border-right:1px solid var(--line); }
+  .shell.right-collapsed { grid-template-columns: minmax(0, 1fr) 40px; }
+  .shell.right-collapsed main { border-right:none; }
+  main { overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; border-right:1px solid var(--line); min-width:0; }
   aside { overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:14px; }
+  .shell.right-collapsed aside { overflow:hidden; padding:4px 0; align-items:center; gap:4px; }
+  .shell.right-collapsed aside .panel { display:none; }
+  .shell.right-collapsed aside .panel.open { display:flex; }
+  #rightEdge { display:none; flex-direction:column; gap:4px; align-items:center; padding:8px 0; }
+  .shell.right-collapsed #rightEdge { display:flex; }
+  #rightEdge button { width:32px; height:32px; padding:0; font-size:16px; display:flex; align-items:center; justify-content:center; }
   .panel { border:1px solid var(--line); border-radius:12px; background:var(--bg); padding:12px; }
-  .panel h2 { font-size:13px; margin:0 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .panel h2 { font-size:13px; margin:0 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; display:flex; justify-content:space-between; align-items:center; }
+  .panel h2 button { font-size:11px; padding:2px 8px; text-transform:none; letter-spacing:0; }
+  .panel.collapsed .panel-body { display:none; }
+  .panel-body { display:flex; flex-direction:column; gap:8px; }
   .msg { padding:10px 14px; border-radius:12px; white-space:pre-wrap; border:1px solid var(--line); background:var(--card); }
   .msg.user { background:var(--user); align-self:flex-end; max-width:80%; }
   .meta { font-size:12px; color:var(--muted); margin-top:6px; }
   .tool { font-size:12px; color:var(--warn); margin-top:6px; }
   .mini { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .stack { display:flex; flex-direction:column; gap:8px; }
+  .stack select, .stack input { width:100%; }
   .item { border:1px solid var(--line); border-radius:10px; padding:8px 10px; background:var(--card); }
   .item small { color:var(--muted); display:block; }
+  .workspace-stack .item { text-align:left; }
   footer { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--line); }
   footer input { flex:1; }
   #status { font-size:12px; color:var(--muted); margin-left:auto; }
   #historyList .item { white-space:pre-wrap; }
+  #sessionList .item, #workspaceList .item { cursor:pointer; }
+  #sessionList .item.active, #workspaceList .item.active { border-color:var(--accent); background:var(--user); }
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: minmax(0,1fr); }
+    aside { border-top:1px solid var(--line); max-height:50vh; }
+    .shell.right-collapsed { grid-template-columns: minmax(0,1fr); }
+  }
 </style>
 </head>
 <body>
@@ -44,110 +65,165 @@
   <input type="text" id="session" placeholder="Session" value="default" style="max-width:180px">
   <label><input type="checkbox" id="tools" checked> Allow browser / code tools</label>
   <button id="refresh" type="button">Refresh</button>
+  <button id="toggleRight" type="button" class="toggle" title="Minimize / maximize right panel">◀</button>
   <span id="status"></span>
 </header>
-<div class="shell">
+<div id="shell" class="shell">
   <main id="log"></main>
-  <aside>
-    <div class="panel">
-      <h2>Conversation</h2>
-      <div id="historyList" class="stack"></div>
+  <aside id="rightPane">
+    <div id="rightEdge" aria-hidden="true">
+      <button type="button" class="toggle" data-open="workspace" title="Workspace">💼</button>
+      <button type="button" class="toggle" data-open="session" title="Sessions">💬</button>
+      <button type="button" class="toggle" data-open="settings" title="Settings">⚙️</button>
+      <button type="button" class="toggle" data-open="presets" title="Presets">📋</button>
+      <button type="button" class="toggle" id="expandRight" title="Expand panel">▶</button>
     </div>
-    <div class="panel">
-      <h2>Runs / tasks</h2>
-      <div id="runsList" class="stack"></div>
-    </div>
-    <div class="panel">
-      <h2>Memory search</h2>
-      <div class="mini">
-        <input type="text" id="memoryQuery" placeholder="Search memories…" style="flex:1">
-        <button id="searchMemories" type="button">Search</button>
-      </div>
-      <div id="memoryList" class="stack" style="margin-top:10px"></div>
-    </div>
-    <div class="panel">
-      <h2>Users</h2>
-      <div class="stack">
+
+    <!-- Workspace / Workplace -->
+    <div class="panel" data-panel="workspace">
+      <h2>Workspace <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
         <div class="mini">
-          <input type="text" id="newUserId" placeholder="User ID" style="flex:1">
-          <input type="password" id="newUserPw" placeholder="Password" style="flex:1">
-          <button id="createUser" type="button">Create</button>
+          <select id="workspaceSel" style="flex:1" aria-label="Workspace"></select>
+          <button id="newWorkspace" type="button" title="New workspace">＋</button>
         </div>
+        <div id="workspaceList" class="stack workspace-stack"></div>
+        <div class="meta">Workspaces group sessions (saved in localStorage).</div>
+      </div>
+    </div>
+
+    <!-- Sessions -->
+    <div class="panel" data-panel="session">
+      <h2>Sessions <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
         <div class="mini">
-          <button id="refreshUsers" type="button">Refresh users</button>
+          <input type="text" id="newSession" placeholder="New session name" style="flex:1">
+          <button id="createSession" type="button">Add</button>
         </div>
-        <div id="usersList" class="stack"></div>
+        <div id="sessionList" class="stack"></div>
+        <div class="meta">Click a session to switch. History & runs are per-session.</div>
       </div>
     </div>
-    <div class="panel">
-      <h2>Cloud sync</h2>
-      <div class="stack">
-        <label>URL <input type="text" id="syncUrl" placeholder="https://sync.example.com/ua"></label>
-        <label>API key <input type="text" id="syncKey" placeholder="optional"></label>
-        <label><input type="checkbox" id="syncEnabled"> Enable sync</label>
-        <label>Interval (min) <input type="number" id="syncInterval" value="10" min="0" max="1440" style="width:80px"></label>
-        <label><input type="checkbox" id="syncOnStartup"> Push on startup</label>
-        <label><input type="checkbox" id="syncOnSave"> Push on save</label>
-        <label><input type="checkbox" id="syncForce"> Force overwrite on pull</label>
+
+    <div class="panel" data-panel="conversation">
+      <h2>Conversation <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
+        <div id="historyList" class="stack"></div>
+      </div>
+    </div>
+    <div class="panel" data-panel="runs">
+      <h2>Runs / tasks <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
+        <div id="runsList" class="stack"></div>
+      </div>
+    </div>
+    <div class="panel" data-panel="memory">
+      <h2>Memory search <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
         <div class="mini">
-          <button id="syncPush" type="button">Push</button>
-          <button id="syncPull" type="button">Pull</button>
+          <input type="text" id="memoryQuery" placeholder="Search memories…" style="flex:1">
+          <button id="searchMemories" type="button">Search</button>
         </div>
-        <div id="syncInfo" class="meta"></div>
+        <div id="memoryList" class="stack" style="margin-top:10px"></div>
       </div>
     </div>
-    <div class="panel">
-      <h2>Presets</h2>
-      <div class="stack">
+    <div class="panel" data-panel="users">
+      <h2>Users <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
+        <div class="stack">
+          <div class="mini">
+            <input type="text" id="newUserId" placeholder="User ID" style="flex:1">
+            <input type="password" id="newUserPw" placeholder="Password" style="flex:1">
+            <button id="createUser" type="button">Create</button>
+          </div>
+          <div class="mini">
+            <button id="refreshUsers" type="button">Refresh users</button>
+          </div>
+          <div id="usersList" class="stack"></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="sync">
+      <h2>Cloud sync <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
+        <div class="stack">
+          <label>URL <input type="text" id="syncUrl" placeholder="https://sync.example.com/ua"></label>
+          <label>API key <input type="text" id="syncKey" placeholder="optional"></label>
+          <label><input type="checkbox" id="syncEnabled"> Enable sync</label>
+          <label>Interval (min) <input type="number" id="syncInterval" value="10" min="0" max="1440" style="width:80px"></label>
+          <label><input type="checkbox" id="syncOnStartup"> Push on startup</label>
+          <label><input type="checkbox" id="syncOnSave"> Push on save</label>
+          <label><input type="checkbox" id="syncForce"> Force overwrite on pull</label>
+          <div class="mini">
+            <button id="syncPush" type="button">Push</button>
+            <button id="syncPull" type="button">Pull</button>
+          </div>
+          <div id="syncInfo" class="meta"></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="presets">
+      <h2>Presets <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
+        <div class="stack">
+          <div class="mini">
+            <input type="text" id="presetName" placeholder="Preset name" style="flex:1">
+            <button id="savePreset" type="button">Save current as preset</button>
+          </div>
+          <button id="exportPresets" type="button">Export presets</button>
+          <button id="loadPresetBtn" type="button">Load selected preset</button>
+          <button id="deletePreset" type="button">Delete selected</button>
+          <div id="presetsList" class="stack"></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="settings">
+      <h2>Settings <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
+        <div class="stack">
+          <label>Provider <input type="text" id="setProvider" placeholder="openai / anthropic / echo"></label>
+          <label>Model <input type="text" id="setModel" placeholder="gpt-5-mini"></label>
+          <label>Memory <input type="text" id="setMemory" placeholder="local / mem0"></label>
+          <label>Code cmd <input type="text" id="setCodeCmd" placeholder="claude -p"></label>
+          <label>Outlines model <input type="text" id="setOutlines" placeholder="HF model id"></label>
+          <label><input type="checkbox" id="setBrowser"> Browser enabled</label>
+          <button id="saveSettings" type="button">Save settings</button>
+          <div id="settingsPath" class="meta"></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="export">
+      <h2>Export data <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
+        <div class="stack">
+          <button id="exportRuns" type="button">Export runs (JSON)</button>
+          <button id="exportMemories" type="button">Export memories (JSON)</button>
+          <button id="importMemories" type="button" onclick="document.getElementById('memoryUpload').click()">
+            Import memories
+            <input type="file" id="memoryUpload" accept=".json" style="display:none" onchange="importMemories(this.files[0])">
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="tasks">
+      <h2>Background tasks <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
         <div class="mini">
-          <input type="text" id="presetName" placeholder="Preset name" style="flex:1">
-          <button id="savePreset" type="button">Save current as preset</button>
+          <input type="text" id="bgTask" placeholder="Task description..." style="flex:1">
+          <select id="bgTool">
+            <option value="browse">Browser</option>
+            <option value="code">Code</option>
+          </select>
+          <button id="runBgTask" type="button">Run</button>
         </div>
-        <button id="exportPresets" type="button">Export presets</button>
-        <button id="loadPresetBtn" type="button">Load selected preset</button>
-        <button id="deletePreset" type="button">Delete selected</button>
-        <div id="presetsList" class="stack"></div>
+        <div id="tasksList" class="stack" style="margin-top:10px"></div>
       </div>
     </div>
-    <div class="panel">
-      <h2>Settings</h2>
-      <div class="stack">
-        <label>Provider <input type="text" id="setProvider" placeholder="openai / anthropic / echo"></label>
-        <label>Model <input type="text" id="setModel" placeholder="gpt-5-mini"></label>
-        <label>Memory <input type="text" id="setMemory" placeholder="local / mem0"></label>
-        <label>Code cmd <input type="text" id="setCodeCmd" placeholder="claude -p"></label>
-        <label>Outlines model <input type="text" id="setOutlines" placeholder="HF model id"></label>
-        <label><input type="checkbox" id="setBrowser"> Browser enabled</label>
-        <button id="saveSettings" type="button">Save settings</button>
-        <div id="settingsPath" class="meta"></div>
+    <div class="panel" data-panel="runtime">
+      <h2>Model / runtime <button type="button" class="toggle" data-collapse>−</button></h2>
+      <div class="panel-body">
+        <div id="runtimeInfo" class="stack"></div>
       </div>
-    </div>
-    <div class="panel">
-      <h2>Export data</h2>
-      <div class="stack">
-        <button id="exportRuns" type="button">Export runs (JSON)</button>
-        <button id="exportMemories" type="button">Export memories (JSON)</button>
-        <button id="importMemories" type="button" onclick="document.getElementById('memoryUpload').click()">
-          Import memories
-          <input type="file" id="memoryUpload" accept=".json" style="display:none" onchange="importMemories(this.files[0])">
-        </button>
-      </div>
-    </div>
-    <div class="panel">
-      <h2>Background tasks</h2>
-      <div class="mini">
-        <input type="text" id="bgTask" placeholder="Task description..." style="flex:1">
-        <select id="bgTool">
-          <option value="browse">Browser</option>
-          <option value="code">Code</option>
-        </select>
-        <button id="runBgTask" type="button">Run</button>
-      </div>
-      <div id="tasksList" class="stack" style="margin-top:10px"></div>
-    </div>
-    <div class="panel">
-      <h2>Model / runtime</h2>
-      <div id="runtimeInfo" class="stack"></div>
     </div>
   </aside>
 </div>
@@ -163,7 +239,166 @@ const log = document.getElementById("log"), input = document.getElementById("inp
       sessionEl = document.getElementById("session"), statusEl = document.getElementById("status"),
       historyList = document.getElementById("historyList"), memoryList = document.getElementById("memoryList"),
       runtimeInfo = document.getElementById("runtimeInfo"), memoryQuery = document.getElementById("memoryQuery"),
-      runsList = document.getElementById("runsList"), settingsPath = document.getElementById("settingsPath");
+      runsList = document.getElementById("runsList"), settingsPath = document.getElementById("settingsPath"),
+      shellEl = document.getElementById("shell"),
+      sessionListEl = document.getElementById("sessionList"),
+      workspaceSel = document.getElementById("workspaceSel"),
+      workspaceListEl = document.getElementById("workspaceList");
+
+// -- Right pane minimize / maximize -----------------------------------
+const LS = {
+  workspaces: "ua.workspaces.v1",   // { id: {name, sessions: [str]} }
+  currentWorkspace: "ua.workspace.current",
+  sessions: "ua.sessions.v1",       // array of session names (global fallback)
+  collapsed: "ua.panels.collapsed.v1",
+  rightCollapsed: "ua.right.collapsed.v1",
+};
+const loadJSON = (k, d) => {
+  try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; }
+};
+const saveJSON = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+function getWorkspaces() {
+  let ws = loadJSON(LS.workspaces, null);
+  if (!ws || typeof ws !== "object") {
+    ws = { default: { name: "Default", sessions: ["default"] } };
+    saveJSON(LS.workspaces, ws);
+  }
+  return ws;
+}
+function getCurrentWorkspaceId() {
+  const id = localStorage.getItem(LS.currentWorkspace);
+  const ws = getWorkspaces();
+  return (id && ws[id]) ? id : Object.keys(ws)[0] || "default";
+}
+function setCurrentWorkspace(id) {
+  localStorage.setItem(LS.currentWorkspace, id);
+  const ws = getWorkspaces();
+  const sessions = ws[id]?.sessions || ["default"];
+  if (!sessions.includes(sessionEl.value)) sessionEl.value = sessions[0] || "default";
+  refreshWorkspaces();
+  refreshSessions();
+}
+function currentSessions() {
+  const ws = getWorkspaces();
+  const id = getCurrentWorkspaceId();
+  return ws[id]?.sessions || ["default"];
+}
+function addSessionToCurrentWorkspace(name) {
+  const ws = getWorkspaces();
+  const id = getCurrentWorkspaceId();
+  if (!ws[id]) ws[id] = { name: id, sessions: [] };
+  if (!ws[id].sessions.includes(name)) ws[id].sessions.push(name);
+  saveJSON(LS.workspaces, ws);
+}
+
+function refreshWorkspaces() {
+  const ws = getWorkspaces();
+  const cur = getCurrentWorkspaceId();
+  workspaceSel.innerHTML = "";
+  Object.entries(ws).forEach(([id, w]) => {
+    const opt = new Option(`${w.name || id} (${(w.sessions||[]).length} sessions)`, id);
+    if (id === cur) opt.selected = true;
+    workspaceSel.appendChild(opt);
+  });
+  workspaceListEl.innerHTML = "";
+  Object.entries(ws).forEach(([id, w]) => {
+    const d = document.createElement("div");
+    d.className = "item" + (id === cur ? " active" : "");
+    d.innerHTML = `<small>${id === cur ? "● " : ""}${w.name || id}</small>${(w.sessions||[]).join(", ") || "(no sessions)"}`;
+    d.onclick = () => { setCurrentWorkspace(id); refreshAll(); };
+    workspaceListEl.appendChild(d);
+  });
+}
+
+function refreshSessions() {
+  const sessions = currentSessions();
+  sessionListEl.innerHTML = "";
+  if (!sessions.length) {
+    const d = document.createElement("div");
+    d.className = "item";
+    d.textContent = "No sessions — add one above.";
+    sessionListEl.appendChild(d);
+    return;
+  }
+  sessions.forEach(name => {
+    const cur = (sessionEl.value || "default") === name;
+    const d = document.createElement("div");
+    d.className = "item" + (cur ? " active" : "");
+    d.innerHTML = `<small>${cur ? "● current • " : ""}</small>${name}`;
+    d.onclick = () => { sessionEl.value = name; refreshSessions(); refreshAll(); };
+    sessionListEl.appendChild(d);
+  });
+}
+
+function setRightCollapsed(collapsed, openPanel) {
+  shellEl.classList.toggle("right-collapsed", collapsed);
+  localStorage.setItem(LS.rightCollapsed, collapsed ? "1" : "0");
+  document.getElementById("toggleRight").textContent = collapsed ? "▶" : "◀";
+  if (collapsed) {
+    // In collapsed mode only the requested panel (if any) is shown as a tab
+    document.querySelectorAll("#rightPane .panel").forEach(p => {
+      p.classList.toggle("open", openPanel ? p.dataset.panel === openPanel : false);
+      p.classList.remove("collapsed");
+    });
+  } else {
+    document.querySelectorAll("#rightPane .panel").forEach(p => p.classList.remove("open"));
+  }
+}
+
+function bindPanelToggles() {
+  document.querySelectorAll("[data-collapse]").forEach(btn => {
+    btn.onclick = () => {
+      const panel = btn.closest(".panel");
+      panel.classList.toggle("collapsed");
+      btn.textContent = panel.classList.contains("collapsed") ? "+" : "−";
+      const map = loadJSON(LS.collapsed, {});
+      map[panel.dataset.panel] = panel.classList.contains("collapsed");
+      saveJSON(LS.collapsed, map);
+    };
+  });
+  // restore collapsed state
+  const map = loadJSON(LS.collapsed, {});
+  document.querySelectorAll("#rightPane .panel").forEach(p => {
+    if (map[p.dataset.panel]) {
+      p.classList.add("collapsed");
+      const b = p.querySelector("[data-collapse]");
+      if (b) b.textContent = "+";
+    }
+  });
+  document.getElementById("toggleRight").onclick = () => {
+    setRightCollapsed(!shellEl.classList.contains("right-collapsed"));
+  };
+  document.getElementById("expandRight").onclick = () => setRightCollapsed(false);
+  document.querySelectorAll("#rightEdge [data-open]").forEach(b => {
+    b.onclick = () => setRightCollapsed(true, b.dataset.open);
+  });
+}
+
+workspaceSel.addEventListener("change", () => setCurrentWorkspace(workspaceSel.value));
+document.getElementById("newWorkspace").onclick = () => {
+  const name = prompt("Workspace name:");
+  if (!name) return;
+  const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || ("ws-" + Date.now().toString(36));
+  const ws = getWorkspaces();
+  if (ws[id]) return alert("Workspace already exists.");
+  ws[id] = { name, sessions: ["default"] };
+  saveJSON(LS.workspaces, ws);
+  setCurrentWorkspace(id);
+  refreshAll();
+};
+document.getElementById("createSession").onclick = () => {
+  const name = document.getElementById("newSession").value.trim();
+  if (!name) return;
+  addSessionToCurrentWorkspace(name);
+  sessionEl.value = name;
+  document.getElementById("newSession").value = "";
+  refreshSessions();
+  refreshAll();
+};
+document.getElementById("newSession").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("createSession").click(); }
+});
 
 function add(cls, text, extras) {
   const d = document.createElement("div");
@@ -268,6 +503,8 @@ async function refreshMemories() {
 
 async function refreshAll() {
   try {
+    refreshWorkspaces();
+    refreshSessions();
     await Promise.all([refreshPersonas(), refreshStatus(), refreshHistory(), refreshRuns(), refreshMemories(), refreshTasks(), refreshUsers(), refreshPresets(), refreshSyncStatus()]);
   } catch (e) {
     add("", "Could not reach the local server: " + e);
@@ -545,7 +782,17 @@ document.getElementById("searchMemories").onclick = refreshMemories;
 document.getElementById("saveSettings").onclick = saveSettings;
 input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
 memoryQuery.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); refreshMemories(); } });
-sessionEl.addEventListener("change", refreshAll);
+sessionEl.addEventListener("change", () => {
+  // keep the session listed in the current workspace
+  const name = sessionEl.value.trim() || "default";
+  addSessionToCurrentWorkspace(name);
+  refreshSessions();
+  refreshAll();
+});
+bindPanelToggles();
+setRightCollapsed(localStorage.getItem(LS.rightCollapsed) === "1");
+refreshWorkspaces();
+refreshSessions();
 refreshAll();
 </script>
 </body>
