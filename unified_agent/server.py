@@ -40,7 +40,7 @@ class ChatRequest(BaseModel):
     message: str
     persona: str | None = None
     session: str = "default"
-    allow_tools: bool = False
+    allow_tools: bool = True
 
 
 class SettingsPatch(BaseModel):
