@@ -10,56 +10,93 @@
     :root { --bg:#161615; --fg:#ecece8; --muted:#9a9a93; --card:#1f1f1d; --line:#33332f; --accent:#7ea2ff; --user:#24304d; --warn:#e0b050; }
   }
   * { box-sizing: border-box; }
-  body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; background:var(--bg); color:var(--fg); height:100vh; display:flex; flex-direction:column; }
-  header, footer, aside, main { background:var(--card); }
-  header { display:flex; gap:12px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
-  header h1 { font-size:16px; margin:0 8px 0 0; }
-  select, input[type=text], button { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
-  button { cursor:pointer; background:var(--accent); color:#fff; border-color:var(--accent); }
-  button:disabled { opacity:.5; cursor:default; }
-  button.toggle { background:var(--card); color:var(--fg); border:1px solid var(--line); }
-  label { color:var(--muted); font-size:13px; display:flex; align-items:center; gap:6px; }
-  .shell { flex:1; display:grid; grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr); min-height:0; }
-  .shell.right-collapsed { grid-template-columns: minmax(0, 1fr) 48px; }
-  .shell.right-collapsed main { border-right:none; }
-  main { overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; border-right:1px solid var(--line); min-width:0; }
-  aside { overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:14px; }
-  .shell.right-collapsed aside { overflow:hidden; padding:8px 4px; align-items:center; gap:6px; }
-  .shell.right-collapsed aside .panel { display:none; }
-  .shell.right-collapsed aside .panel.open { display:flex; width:100%; }
-  #rightEdge { display:none; flex-direction:column; gap:6px; align-items:center; padding:4px 0; }
-  .shell.right-collapsed #rightEdge { display:flex; }
-  #rightEdge button { width:36px; height:36px; padding:0; font-size:18px; display:flex; align-items:center; justify-content:center; border-radius:10px; }
-  #rightEdge button.active { background:var(--accent); color:#fff; border-color:var(--accent); }
-  .panel { border:1px solid var(--line); border-radius:12px; background:var(--bg); padding:12px; }
-  .panel h2 { font-size:13px; margin:0 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; display:flex; justify-content:space-between; align-items:center; }
-  .panel h2 button { font-size:11px; padding:2px 8px; text-transform:none; letter-spacing:0; }
+  :root {
+    --bg:#f7f7f5; --fg:#1d1d1b; --muted:#6b6b66; --card:#fff; --line:#e3e3de;
+    --accent:#2b5fd9; --user:#e8eefc; --warn:#8a5a00;
+    --rail-bg:#f0f0ee; --rail-fg:#52525b; --rail-line:#e3e3de;
+    --panel-bg:#fafafa; --panel-line:#e8e8e6;
+    --nav-hover:rgba(0,0,0,.06); --nav-active:rgba(43,95,217,.12);
+    --nav-fg:#1d1d1b; --nav-muted:#6b6b66;
+    --radius:8px; --radius-lg:12px;
+    --rail-w:56px; --panel-w:300px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#161615; --fg:#ecece8; --muted:#9a9a93; --card:#1f1f1d; --line:#33332f;
+      --accent:#7ea2ff; --user:#24304d; --warn:#e0b050;
+      --rail-bg:#101010; --rail-fg:#a1a1a3; --rail-line:#222;
+      --panel-bg:#161615; --panel-line:#33332f;
+      --nav-hover:rgba(255,255,255,.06); --nav-active:rgba(126,162,255,.14);
+      --nav-fg:#ecece8; --nav-muted:#9a9a93;
+    }
+  }
+  body { margin:0; font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--fg); height:100vh; display:flex; flex-direction:column; }
+  header, footer, main { background:var(--card); }
+  header { display:flex; gap:8px; align-items:center; padding:8px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:14px; font-weight:600; margin:0 6px 0 0; letter-spacing:-0.01em; }
+  select, input[type=text], input[type=password], button { font:inherit; font-size:13px; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:6px 10px; }
+  button { cursor:pointer; background:var(--accent); color:#fff; border-color:var(--accent); font-weight:500; transition:opacity .15s, background .15s; }
+  button:hover { opacity:.9; }
+  button:disabled { opacity:.45; cursor:default; }
+  button.toggle, button.ghost { background:transparent; color:var(--fg); border:1px solid var(--line); font-weight:400; }
+  button.toggle:hover, button.ghost:hover { background:var(--nav-hover); }
+  button.danger { color:#b3261e; border-color:#e0a9a6; }
+  button.danger:hover { background:rgba(179,38,30,.06); }
+  label { color:var(--muted); font-size:12.5px; display:flex; align-items:center; gap:6px; }
+  input[type=checkbox] { width:15px; height:15px; accent-color:var(--accent); }
+  /* ---------- Shell: VS Code activity bar (right) ---------- */
+  .shell { flex:1; display:grid; grid-template-columns: minmax(0,1fr) var(--rail-w); min-height:0; }
+  .shell.panel-open { grid-template-columns: minmax(0,1fr) var(--panel-w) var(--rail-w); }
+  main { overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; gap:12px; min-width:0; }
+  /* Activity rail */
+  #rail { background:var(--rail-bg); border-left:1px solid var(--rail-line); display:flex; flex-direction:column; align-items:center; padding:8px 0; gap:2px; }
+  #rail .rail-btn { width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:18px; background:transparent; border:1px solid transparent; color:var(--rail-fg); position:relative; padding:0; }
+  #rail .rail-btn:hover { background:var(--nav-hover); color:var(--nav-fg); }
+  #rail .rail-btn.active { background:var(--nav-active); color:var(--accent); }
+  #rail .rail-btn.active::before { content:""; position:absolute; left:-8px; top:8px; bottom:8px; width:2px; border-radius:2px; background:var(--accent); }
+  #rail .rail-spacer { flex:1; }
+  /* Side panel (Linear-style) */
+  #sidePanel { display:none; flex-direction:column; background:var(--panel-bg); border-left:1px solid var(--panel-line); min-height:0; }
+  .shell.panel-open #sidePanel { display:flex; }
+  #sidePanelHeader { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--panel-line); position:sticky; top:0; background:var(--panel-bg); z-index:1; }
+  #sidePanelTitle { font-size:13px; font-weight:600; letter-spacing:-0.01em; }
+  #sidePanelBody { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:14px; }
+  .panel { border:1px solid var(--panel-line); border-radius:var(--radius-lg); background:var(--card); padding:12px; }
+  .panel h2 { font-size:11px; margin:0 0 10px; color:var(--nav-muted); text-transform:uppercase; letter-spacing:.06em; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+  .panel h2 button { font-size:13px; padding:1px 7px; text-transform:none; letter-spacing:0; line-height:1.2; }
   .panel.collapsed .panel-body { display:none; }
   .panel-body { display:flex; flex-direction:column; gap:8px; }
-  .msg { padding:10px 14px; border-radius:12px; white-space:pre-wrap; border:1px solid var(--line); background:var(--card); }
+  .divider { height:1px; background:var(--panel-line); margin:4px 0; }
+  /* Nav list (Linear) */
+  .nav-item { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:var(--radius); font-size:13px; cursor:pointer; border:1px solid transparent; background:transparent; }
+  .nav-item:hover { background:var(--nav-hover); }
+  .nav-item.active { background:var(--nav-active); color:var(--accent); font-weight:500; }
+  .nav-item .nav-ico { font-size:15px; flex-shrink:0; width:20px; text-align:center; }
+  .nav-item .nav-label { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .nav-item .nav-meta { font-size:11px; color:var(--nav-muted); font-weight:400; }
+  .nav-item.active .nav-meta { color:var(--accent); opacity:.8; }
+  /* Message log */
+  .msg { padding:10px 14px; border-radius:var(--radius-lg); white-space:pre-wrap; border:1px solid var(--line); background:var(--card); font-size:14px; max-width:880px; }
   .msg.user { background:var(--user); align-self:flex-end; max-width:80%; }
   .meta { font-size:12px; color:var(--muted); margin-top:6px; }
   .tool { font-size:12px; color:var(--warn); margin-top:6px; }
-  .mini { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .mini { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
   .stack { display:flex; flex-direction:column; gap:8px; }
-  .stack select, .stack input { width:100%; }
-  .item { border:1px solid var(--line); border-radius:10px; padding:8px 10px; background:var(--card); }
-  .item small { color:var(--muted); display:block; }
-  .workspace-stack .item, .session-stack .item { text-align:left; }
-  .row-actions { display:flex; gap:4px; margin-top:4px; }
-  .row-actions button { font-size:11px; padding:2px 8px; }
-  .danger { color:#b3261e; }
-  footer { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--line); }
-  footer input { flex:1; }
+  .stack select, .stack input { width:100%; font-size:13px; }
+  .item { border:1px solid var(--panel-line); border-radius:var(--radius); padding:8px 10px; background:var(--card); font-size:13px; }
+  .item small { color:var(--nav-muted); display:block; font-size:11px; }
+  .item.active { border-color:var(--accent); background:var(--nav-active); }
+  .row-actions { display:flex; gap:4px; margin-top:6px; }
+  .row-actions button { font-size:11px; padding:2px 8px; border-radius:6px; }
+  footer { display:flex; gap:8px; padding:10px 14px; border-top:1px solid var(--line); }
+  footer input { flex:1; font-size:14px; }
   #status { font-size:12px; color:var(--muted); margin-left:auto; }
-  #historyList .item { white-space:pre-wrap; }
-  #sessionList .item, #workspaceList .item { cursor:pointer; }
-  #sessionList .item.active, #workspaceList .item.active { border-color:var(--accent); background:var(--user); }
+  #historyList .item { white-space:pre-wrap; font-size:12.5px; }
+  .empty { color:var(--nav-muted); font-size:12.5px; text-align:center; padding:12px; }
   @media (max-width: 900px) {
-    .shell { grid-template-columns: minmax(0,1fr); }
-    aside { border-top:1px solid var(--line); max-height:50vh; }
-    .shell.right-collapsed { grid-template-columns: minmax(0,1fr); }
-    .shell.right-collapsed aside .panel.open { max-height:40vh; overflow-y:auto; }
+    .shell, .shell.panel-open { grid-template-columns: minmax(0,1fr) var(--rail-w); }
+    #sidePanel { position:fixed; right:var(--rail-w); top:0; bottom:0; width:min(360px,86vw); box-shadow:-8px 0 24px rgba(0,0,0,.15); z-index:10; }
+    .shell.panel-open #sidePanel { display:flex; }
   }
 </style>
 </head>
@@ -70,23 +107,20 @@
   <input type="text" id="session" placeholder="Session" value="default" style="max-width:180px" title="Current session (type to switch; Enter adds it)">
   <select id="workspaceTop" aria-label="Workspace (top)" style="max-width:180px" title="Current workplace"></select>
   <label><input type="checkbox" id="tools" checked> Allow browser / code tools</label>
-  <button id="refresh" type="button">Refresh</button>
-  <button id="toggleRight" type="button" class="toggle" title="Minimize / maximize right panel">◀</button>
+  <button id="refresh" type="button" class="toggle">Refresh</button>
+  <button id="toggleRight" type="button" class="toggle" title="Minimize / maximize right panel">✕</button>
   <span id="status"></span>
 </header>
 <div id="shell" class="shell">
   <main id="log"></main>
-  <aside id="rightPane">
-    <div id="rightEdge">
-      <button type="button" class="toggle" data-open="workspace" title="Workspace (Workplace)">💼</button>
-      <button type="button" class="toggle" data-open="session" title="Sessions">💬</button>
-      <button type="button" class="toggle" data-open="conversation" title="Conversation">📜</button>
-      <button type="button" class="toggle" data-open="runs" title="Runs / tasks">📊</button>
-      <button type="button" class="toggle" data-open="settings" title="Settings">⚙️</button>
-      <button type="button" class="toggle" data-open="presets" title="Presets">📋</button>
-      <button type="button" class="toggle" data-open="memory" title="Memory">🧠</button>
-      <button type="button" class="toggle" id="expandRight" title="Expand panel">▶</button>
+
+  <!-- Side panel: Linear-style, one tab at a time -->
+  <section id="sidePanel" aria-label="Side panel">
+    <div id="sidePanelHeader">
+      <span id="sidePanelTitle">Workspace</span>
+      <button id="closeSide" type="button" class="toggle" title="Close panel">✕</button>
     </div>
+    <div id="sidePanelBody">
 
     <!-- Workspace / Workplace (server-side) -->
     <div class="panel" data-panel="workspace">
@@ -96,15 +130,14 @@
           <select id="workspaceSel" style="flex:1" aria-label="Workspace"></select>
           <button id="newWorkspace" type="button" title="New workspace">＋</button>
         </div>
-        <div id="workspaceList" class="stack workspace-stack"></div>
+        <div id="workspaceList" class="stack"></div>
+        <div class="divider"></div>
         <div class="mini">
           <input type="text" id="renameWorkspaceInput" placeholder="Rename selected…" style="flex:1">
-          <button id="renameWorkspace" type="button">Rename</button>
+          <button id="renameWorkspace" type="button" class="toggle">Rename</button>
         </div>
-        <div class="mini">
-          <button id="deleteWorkspace" type="button" class="toggle danger">Delete workspace</button>
-        </div>
-        <div class="meta">Server-stored in ~/.unified-agent/&lt;user&gt;/workspaces.json — survives browser clear. Last workspace can't be deleted.</div>
+        <button id="deleteWorkspace" type="button" class="toggle danger">Delete workspace</button>
+        <div class="meta">Server-stored — survives browser clear.</div>
       </div>
     </div>
 
@@ -113,11 +146,11 @@
       <h2>Sessions <button type="button" class="toggle" data-collapse>−</button></h2>
       <div class="panel-body">
         <div class="mini">
-          <input type="text" id="newSession" placeholder="New session name" style="flex:1" title="e.g. malaysia-news-2026-11-08">
+          <input type="text" id="newSession" placeholder="New session…" style="flex:1" title="e.g. malaysia-news-2026-11-08">
           <button id="createSession" type="button">Add</button>
         </div>
-        <div id="sessionList" class="stack session-stack"></div>
-        <div class="meta">Full scope: history + runs + persisted file per session. Click to switch. Last session in a workspace can't be deleted.</div>
+        <div id="sessionList" class="stack"></div>
+        <div class="meta">History + runs + persisted file per session.</div>
       </div>
     </div>
 
@@ -152,9 +185,7 @@
             <input type="password" id="newUserPw" placeholder="Password" style="flex:1">
             <button id="createUser" type="button">Create</button>
           </div>
-          <div class="mini">
-            <button id="refreshUsers" type="button">Refresh users</button>
-          </div>
+          <button id="refreshUsers" type="button" class="toggle">Refresh users</button>
           <div id="usersList" class="stack"></div>
         </div>
       </div>
@@ -172,7 +203,7 @@
           <label><input type="checkbox" id="syncForce"> Force overwrite on pull</label>
           <div class="mini">
             <button id="syncPush" type="button">Push</button>
-            <button id="syncPull" type="button">Pull</button>
+            <button id="syncPull" type="button" class="toggle">Pull</button>
           </div>
           <div id="syncInfo" class="meta"></div>
         </div>
@@ -184,11 +215,13 @@
         <div class="stack">
           <div class="mini">
             <input type="text" id="presetName" placeholder="Preset name" style="flex:1">
-            <button id="savePreset" type="button">Save current as preset</button>
+            <button id="savePreset" type="button">Save</button>
           </div>
-          <button id="exportPresets" type="button">Export presets</button>
-          <button id="loadPresetBtn" type="button">Load selected preset</button>
-          <button id="deletePreset" type="button">Delete selected</button>
+          <div class="mini">
+            <button id="loadPresetBtn" type="button" class="toggle">Load</button>
+            <button id="exportPresets" type="button" class="toggle">Export</button>
+            <button id="deletePreset" type="button" class="toggle danger">Delete</button>
+          </div>
           <div id="presetsList" class="stack"></div>
         </div>
       </div>
@@ -212,9 +245,9 @@
       <h2>Export data <button type="button" class="toggle" data-collapse>−</button></h2>
       <div class="panel-body">
         <div class="stack">
-          <button id="exportRuns" type="button">Export runs (JSON)</button>
-          <button id="exportMemories" type="button">Export memories (JSON)</button>
-          <button id="importMemories" type="button" onclick="document.getElementById('memoryUpload').click()">
+          <button id="exportRuns" type="button" class="toggle">Export runs (JSON)</button>
+          <button id="exportMemories" type="button" class="toggle">Export memories (JSON)</button>
+          <button id="importMemories" type="button" class="toggle" onclick="document.getElementById('memoryUpload').click()">
             Import memories
             <input type="file" id="memoryUpload" accept=".json" style="display:none" onchange="importMemories(this.files[0])">
           </button>
@@ -226,7 +259,7 @@
       <div class="panel-body">
         <div class="mini">
           <input type="text" id="bgTask" placeholder="Task description..." style="flex:1">
-          <select id="bgTool">
+          <select id="bgTool" style="width:110px">
             <option value="browse">Browser</option>
             <option value="code">Code</option>
           </select>
@@ -241,7 +274,24 @@
         <div id="runtimeInfo" class="stack"></div>
       </div>
     </div>
-  </aside>
+
+    </div><!-- /#sidePanelBody -->
+  </section>
+
+  <!-- Activity bar (right) -->
+  <nav id="rail" aria-label="Side panel tabs">
+    <button type="button" class="rail-btn" data-open="workspace" title="Workspace">💼</button>
+    <button type="button" class="rail-btn" data-open="session" title="Sessions">💬</button>
+    <button type="button" class="rail-btn" data-open="conversation" title="Conversation">📜</button>
+    <button type="button" class="rail-btn" data-open="runs" title="Runs / tasks">📊</button>
+    <button type="button" class="rail-btn" data-open="settings" title="Settings">⚙️</button>
+    <button type="button" class="rail-btn" data-open="presets" title="Presets">📋</button>
+    <button type="button" class="rail-btn" data-open="memory" title="Memory">🧠</button>
+    <div class="rail-spacer"></div>
+    <button type="button" class="rail-btn" data-open="tasks" title="Background tasks">⚡</button>
+  </nav>
+
+  <!-- legacy aside removed -->
 </div>
 <footer>
   <input type="text" id="input" placeholder="Message…" autofocus>
@@ -307,10 +357,9 @@ async function refreshWorkspaces() {
   workspaceListEl.innerHTML = "";
   (WS.workspaces || []).forEach(w => {
     const d = document.createElement("div");
-    d.className = "item" + (w.id === cur ? " active" : "");
-    d.innerHTML = `<small>${w.id === cur ? "● current • " : ""}${w.name || w.id} <span class="meta">${w.session_count ?? 0} sessions</span></small>${(w.sessions || []).join(", ") || "(no sessions)"}`;
+    d.className = "nav-item" + (w.id === cur ? " active" : "");
+    d.innerHTML = `<span class="nav-ico">💼</span><span class="nav-label">${w.name || w.id}</span><span class="nav-meta">${w.session_count ?? 0} sessions</span>`;
     d.onclick = async () => {
-      // switch workspace = adopt its first session (server tracks current)
       const next = (w.sessions || [])[0] || "default";
       sessionEl.value = next;
       await ensureSession(next, w.id);
@@ -329,7 +378,7 @@ async function refreshSessions() {
   sessionListEl.innerHTML = "";
   if (!sessions.length) {
     const d = document.createElement("div");
-    d.className = "item";
+    d.className = "empty";
     d.textContent = "No sessions — add one above.";
     sessionListEl.appendChild(d);
     return;
@@ -337,9 +386,9 @@ async function refreshSessions() {
   sessions.forEach(s => {
     const cur = currentSession() === s.id;
     const d = document.createElement("div");
-    d.className = "item" + (cur ? " active" : "");
-    const updated = s.updated_at ? new Date(s.updated_at * 1000).toLocaleString() : "";
-    d.innerHTML = `<small>${cur ? "● current • " : ""}${s.id} <span class="meta">${s.message_count ?? 0} msgs${updated ? " • " + updated : ""}</span></small>`;
+    d.className = "nav-item" + (cur ? " active" : "");
+    const updated = s.updated_at ? new Date(s.updated_at * 1000).toLocaleDateString() : "";
+    d.innerHTML = `<span class="nav-ico">💬</span><span class="nav-label">${s.id}</span><span class="nav-meta">${s.message_count ?? 0} msgs${updated ? " • " + updated : ""}</span>`;
     d.onclick = () => { sessionEl.value = s.id; refreshSessions(); refreshAll(); };
     const row = document.createElement("div");
     row.className = "row-actions";
@@ -379,20 +428,29 @@ async function ensureSession(name, workspace_id) {
 }
 
 function openPanel(name) {
+  if (!name) return closePanel();
   localStorage.setItem(LS.openPanel, name);
-  document.querySelectorAll("#rightEdge [data-open]").forEach(b => b.classList.toggle("active", b.dataset.open === name));
-  document.querySelectorAll("#rightPane .panel").forEach(p => p.classList.toggle("open", p.dataset.panel === name));
+  shellEl.classList.add("panel-open");
+  document.getElementById("toggleRight").textContent = "✕";
+  document.querySelectorAll("#rail [data-open]").forEach(b => b.classList.toggle("active", b.dataset.open === name));
+  // title
+  const titles = { workspace:"Workspace", session:"Sessions", conversation:"Conversation", runs:"Runs / tasks", settings:"Settings", presets:"Presets", memory:"Memory", users:"Users", sync:"Cloud sync", export:"Export", tasks:"Background tasks", runtime:"Model / runtime" };
+  document.getElementById("sidePanelTitle").textContent = titles[name] || name;
+  // show only that panel; collapse button inside each header still works
+  document.querySelectorAll("#sidePanelBody .panel").forEach(p => {
+    p.style.display = p.dataset.panel === name ? "" : "none";
+  });
 }
-function setRightCollapsed(collapsed, openPanelName) {
-  shellEl.classList.toggle("right-collapsed", collapsed);
-  localStorage.setItem(LS.rightCollapsed, collapsed ? "1" : "0");
-  document.getElementById("toggleRight").textContent = collapsed ? "▶" : "◀";
-  if (collapsed) {
-    openPanel(openPanelName || localStorage.getItem(LS.openPanel) || "workspace");
-  } else {
-    document.querySelectorAll("#rightPane .panel").forEach(p => p.classList.remove("open"));
-    document.querySelectorAll("#rightEdge [data-open]").forEach(b => b.classList.remove("active"));
-  }
+function closePanel() {
+  shellEl.classList.remove("panel-open");
+  document.getElementById("toggleRight").textContent = "☰";
+  document.querySelectorAll("#rail [data-open]").forEach(b => b.classList.remove("active"));
+}
+function setRightCollapsed(hidden, openPanelName) {
+  // hidden=true -> rail only (default professional state), hidden=false -> panel open
+  if (hidden) closePanel();
+  else openPanel(openPanelName || localStorage.getItem(LS.openPanel) || "workspace");
+  localStorage.setItem(LS.rightCollapsed, hidden ? "1" : "0");
 }
 
 function bindPanelToggles() {
@@ -407,19 +465,27 @@ function bindPanelToggles() {
     };
   });
   const map = loadJSON(LS.collapsed, {});
-  document.querySelectorAll("#rightPane .panel").forEach(p => {
+  document.querySelectorAll("#sidePanelBody .panel").forEach(p => {
     if (map[p.dataset.panel]) {
       p.classList.add("collapsed");
       const b = p.querySelector("[data-collapse]");
       if (b) b.textContent = "+";
     }
   });
-  document.getElementById("toggleRight").onclick = () => {
-    setRightCollapsed(!shellEl.classList.contains("right-collapsed"));
-  };
-  document.getElementById("expandRight").onclick = () => setRightCollapsed(false);
-  document.querySelectorAll("#rightEdge [data-open]").forEach(b => {
-    b.onclick = () => setRightCollapsed(true, b.dataset.open);
+  // Header toggle & close
+  document.getElementById("toggleRight").onclick = () => setRightCollapsed(shellEl.classList.contains("panel-open"));
+  document.getElementById("closeSide").onclick = () => setRightCollapsed(true);
+  // Rail: click same icon again closes (VS Code behavior)
+  document.querySelectorAll("#rail [data-open]").forEach(b => {
+    b.onclick = () => {
+      const isOpen = shellEl.classList.contains("panel-open") && b.classList.contains("active");
+      if (isOpen) setRightCollapsed(true);
+      else openPanel(b.dataset.open);
+    };
+  });
+  // Keyboard: Ctrl/Cmd+J toggles panel
+  document.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") { e.preventDefault(); document.getElementById("toggleRight").click(); }
   });
 }
 
@@ -862,7 +928,14 @@ sessionEl.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); sessionEl.dispatchEvent(new Event("change")); }
 });
 bindPanelToggles();
-setRightCollapsed(localStorage.getItem(LS.rightCollapsed) === "1", localStorage.getItem(LS.openPanel) || undefined);
+// Rail by default (professional clean state), restore open panel if user left it open
+const wasHidden = localStorage.getItem(LS.rightCollapsed);
+if (wasHidden === null) {
+  // First visit: rail-only, clean main area
+  closePanel();
+} else {
+  setRightCollapsed(wasHidden === "1", localStorage.getItem(LS.openPanel) || undefined);
+}
 refreshAll();
 </script>
 </body>
