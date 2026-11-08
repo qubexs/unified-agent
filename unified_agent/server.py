@@ -22,12 +22,11 @@ from .config import Settings
 from .personas import Persona
 from .presets import PresetsStore
 from .cloud_sync import push_snapshot, pull_snapshot, sync_enabled
-from .config import Settings
-from .presets import PresetsStore
 from .sync_scheduler import get_scheduler
 from .task_queue import get_queue, TaskStatus
 from .users import UserStore
 from .tools import ToolUnavailable, run_browser_task, run_code_task
+from .workspaces import WorkspaceStore
 
 UI_FILE = Path(__file__).parent / "ui.html"
 
@@ -36,11 +35,39 @@ def _build_presets_store(settings: Settings) -> PresetsStore:
     return PresetsStore(settings.home / settings.user_id / "presets.json")
 
 
+def _build_workspace_store(settings: Settings) -> WorkspaceStore:
+    if settings.user_id == "default_user":
+        user_dir = settings.home
+    else:
+        user_dir = settings.home / settings.user_id
+    user_dir.mkdir(parents=True, exist_ok=True)
+    return WorkspaceStore(user_dir)
+
+
 class ChatRequest(BaseModel):
     message: str
     persona: str | None = None
     session: str = "default"
+    workspace_id: str | None = None
     allow_tools: bool = True
+
+
+class WorkspaceCreateRequest(BaseModel):
+    name: str
+
+
+class WorkspaceRenameRequest(BaseModel):
+    name: str
+
+
+class SessionCreateRequest(BaseModel):
+    session: str
+    workspace_id: str | None = None
+
+
+class SessionRenameRequest(BaseModel):
+    workspace_id: str | None = None
+    new_name: str
 
 
 class SettingsPatch(BaseModel):
@@ -81,10 +108,97 @@ def create_app(agent: Agent, personas: dict[str, Persona], token: str | None = N
         if not secrets.compare_digest(x_ua_token, token):
             raise HTTPException(status_code=401, detail="bad token")
 
+    def ws_store() -> WorkspaceStore:
+        return _build_workspace_store(agent.settings)
+
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
         html = UI_FILE.read_text(encoding="utf-8").replace("__UA_TOKEN__", token)
         return html
+
+    # --- workspaces & sessions (proper server-side) ---
+    @app.get("/api/workspaces", dependencies=[Depends(auth)])
+    def list_workspaces() -> dict:
+        store = ws_store()
+        data = store.list()
+        cur_ws, cur_ss = store.current()
+        # enrich with counts
+        out = []
+        for ws_id, w in data["workspaces"].items():
+            cnt = len(w.get("sessions") or [])
+            out.append({"id": ws_id, "name": w.get("name") or ws_id, "sessions": w.get("sessions") or [], "session_count": cnt, "created_at": w.get("created_at"), "updated_at": w.get("updated_at")})
+        return {"workspaces": out, "current_workspace": cur_ws, "current_session": cur_ss}
+
+    @app.post("/api/workspaces", dependencies=[Depends(auth)])
+    def create_workspace(req: WorkspaceCreateRequest) -> dict:
+        try:
+            ws = ws_store().create_workspace(req.name)
+            return {"ok": True, **ws}
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+
+    @app.post("/api/workspaces/{ws_id}/rename", dependencies=[Depends(auth)])
+    def rename_workspace(ws_id: str, req: WorkspaceRenameRequest) -> dict:
+        try:
+            ws = ws_store().rename_workspace(ws_id, req.name)
+            return {"ok": True, **ws}
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    @app.delete("/api/workspaces/{ws_id}", dependencies=[Depends(auth)])
+    def delete_workspace(ws_id: str) -> dict:
+        try:
+            ws_store().delete_workspace(ws_id)
+            return {"ok": True}
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.get("/api/workspaces/{ws_id}/sessions", dependencies=[Depends(auth)])
+    def list_ws_sessions(ws_id: str) -> list[dict]:
+        try:
+            return ws_store().list_sessions(ws_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    @app.post("/api/sessions", dependencies=[Depends(auth)])
+    def create_session(req: SessionCreateRequest) -> dict:
+        try:
+            rec = ws_store().ensure_session(req.session, req.workspace_id)
+            return {"ok": True, **rec}
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.post("/api/sessions/ensure", dependencies=[Depends(auth)])
+    def ensure_session(req: SessionCreateRequest) -> dict:
+        try:
+            rec = ws_store().ensure_session(req.session, req.workspace_id)
+            return {"ok": True, **rec}
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.post("/api/sessions/{session}/rename", dependencies=[Depends(auth)])
+    def rename_session(session: str, req: SessionRenameRequest) -> dict:
+        ws = req.workspace_id
+        if not ws:
+            ws, _ = ws_store().current()
+        try:
+            rec = ws_store().rename_session(ws, session, req.new_name)
+            return {"ok": True, **rec}
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.delete("/api/sessions/{session}", dependencies=[Depends(auth)])
+    def delete_session(session: str, workspace_id: str | None = None) -> dict:
+        ws = workspace_id
+        if not ws:
+            ws, _ = ws_store().current()
+        try:
+            ws_store().delete_session(ws, session)
+            # also drop in-memory history
+            agent.clear_session(session)
+            return {"ok": True}
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     @app.get("/api/personas", dependencies=[Depends(auth)])
     def list_personas() -> list[dict]:
@@ -186,6 +300,15 @@ def create_app(agent: Agent, personas: dict[str, Persona], token: str | None = N
 
     @app.get("/api/history", dependencies=[Depends(auth)])
     def history(session: str = "default") -> list[dict]:
+        store = ws_store()
+        # If in-memory is empty (e.g. server restarted), reload from disk
+        if not agent.get_history(session):
+            try:
+                disk = store.load_history(session)
+                if disk:
+                    agent.load_history(session, disk)
+            except Exception:
+                pass
         return [dict(m) for m in agent.get_history(session)]
 
     @app.get("/api/memories", dependencies=[Depends(auth)])
@@ -232,10 +355,23 @@ def create_app(agent: Agent, personas: dict[str, Persona], token: str | None = N
         persona = personas.get(req.persona) if req.persona else None
         if req.persona and persona is None:
             raise HTTPException(status_code=404, detail="unknown persona")
+        # Ensure session exists in its workspace (creates lazily on first chat)
+        store = ws_store()
+        try:
+            store.ensure_session(req.session, req.workspace_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         approve = (lambda action, task: True) if req.allow_tools else None
         r = agent.chat(req.message, persona, req.session, approve=approve)
+        # Persist history so a new browser / device sees the same session
+        try:
+            store.save_history(req.session, agent.get_history(req.session))
+        except Exception:
+            pass
         return {
             "text": r.text,
+            "session": req.session,
+            "workspace_id": req.workspace_id,
             "memories": r.memories,
             "tool_calls": [
                 {"action": c.action, "input": c.input, "result": c.result, "approved": c.approved}

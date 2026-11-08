@@ -94,6 +94,18 @@ class Agent:
     def get_history(self, session: str = "default") -> list[Message]:
         return list(self._history.get(session, []))
 
+    def clear_session(self, session: str) -> None:
+        """Drop in-memory history (used when a session is deleted server-side)."""
+        self._history.pop(session, None)
+        self._runs = [r for r in self._runs if r.session != session]
+
+    def load_history(self, session: str, messages: list[Message]) -> None:
+        """Seed in-memory history from disk (used after server restart)."""
+        self._history[session] = list(messages[-20:])
+
+    def list_sessions(self) -> list[str]:
+        return sorted(self._history.keys())
+
     def get_runs(self, session: str | None = None, limit: int = 20) -> list[dict]:
         runs = [r for r in self._runs if session is None or r.session == session]
         runs = runs[-limit:]
