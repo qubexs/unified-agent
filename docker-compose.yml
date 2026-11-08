@@ -1,0 +1,42 @@
+services:
+  unified-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8765:8765"
+    environment:
+      UA_HOST: 0.0.0.0
+      UA_PORT: 8765
+      # Optional examples:
+      # UA_PROVIDER: openai
+      # UA_MODEL: gpt-5-mini
+      # UA_BASE_URL: http://host.docker.internal:11434/v1
+      # UA_MEMORY: mem0
+      # UA_CODE_CMD: "claude -p"
+      # UA_OUTLINES_MODEL: "Qwen/Qwen2.5-1.5B-Instruct"
+      # UA_BROWSER: "0"
+    volumes:
+      - ua-data:/root/.unified-agent
+
+  unified-agent-browser:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["browser"]
+    ports:
+      - "8766:8765"
+    environment:
+      UA_HOST: 0.0.0.0
+      UA_PORT: 8765
+      UA_BROWSER: "1"
+      # For browser automation, use a real model provider:
+      # UA_PROVIDER: openai
+      # UA_MODEL: gpt-5-mini
+      # UA_BASE_URL: http://host.docker.internal:11434/v1
+    volumes:
+      - ua-data-browser:/root/.unified-agent
+
+volumes:
+  ua-data:
+  ua-data-browser:

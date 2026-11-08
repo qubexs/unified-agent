@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unified Agent</title>
+<style>
+  :root { --bg:#f7f7f5; --fg:#1d1d1b; --muted:#6b6b66; --card:#fff; --line:#e3e3de; --accent:#2b5fd9; --user:#e8eefc; --warn:#8a5a00; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161615; --fg:#ecece8; --muted:#9a9a93; --card:#1f1f1d; --line:#33332f; --accent:#7ea2ff; --user:#24304d; --warn:#e0b050; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; background:var(--bg); color:var(--fg); height:100vh; display:flex; flex-direction:column; }
+  header, footer, aside, main { background:var(--card); }
+  header { display:flex; gap:12px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 8px 0 0; }
+  select, input[type=text], button { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
+  button { cursor:pointer; background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  label { color:var(--muted); font-size:13px; display:flex; align-items:center; gap:6px; }
+  .shell { flex:1; display:grid; grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr); min-height:0; }
+  main { overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; border-right:1px solid var(--line); }
+  aside { overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:14px; }
+  .panel { border:1px solid var(--line); border-radius:12px; background:var(--bg); padding:12px; }
+  .panel h2 { font-size:13px; margin:0 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .msg { padding:10px 14px; border-radius:12px; white-space:pre-wrap; border:1px solid var(--line); background:var(--card); }
+  .msg.user { background:var(--user); align-self:flex-end; max-width:80%; }
+  .meta { font-size:12px; color:var(--muted); margin-top:6px; }
+  .tool { font-size:12px; color:var(--warn); margin-top:6px; }
+  .mini { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .stack { display:flex; flex-direction:column; gap:8px; }
+  .item { border:1px solid var(--line); border-radius:10px; padding:8px 10px; background:var(--card); }
+  .item small { color:var(--muted); display:block; }
+  footer { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--line); }
+  footer input { flex:1; }
+  #status { font-size:12px; color:var(--muted); margin-left:auto; }
+  #historyList .item { white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Unified Agent</h1>
+  <select id="persona" aria-label="Persona"></select>
+  <input type="text" id="session" placeholder="Session" value="default" style="max-width:180px">
+  <label><input type="checkbox" id="tools"> Allow browser / code tools</label>
+  <button id="refresh" type="button">Refresh</button>
+  <span id="status"></span>
+</header>
+<div class="shell">
+  <main id="log"></main>
+  <aside>
+    <div class="panel">
+      <h2>Conversation</h2>
+      <div id="historyList" class="stack"></div>
+    </div>
+    <div class="panel">
+      <h2>Runs / tasks</h2>
+      <div id="runsList" class="stack"></div>
+    </div>
+    <div class="panel">
+      <h2>Memory search</h2>
+      <div class="mini">
+        <input type="text" id="memoryQuery" placeholder="Search memories…" style="flex:1">
+        <button id="searchMemories" type="button">Search</button>
+      </div>
+      <div id="memoryList" class="stack" style="margin-top:10px"></div>
+    </div>
+    <div class="panel">
+      <h2>Users</h2>
+      <div class="stack">
+        <div class="mini">
+          <input type="text" id="newUserId" placeholder="User ID" style="flex:1">
+          <input type="password" id="newUserPw" placeholder="Password" style="flex:1">
+          <button id="createUser" type="button">Create</button>
+        </div>
+        <div class="mini">
+          <button id="refreshUsers" type="button">Refresh users</button>
+        </div>
+        <div id="usersList" class="stack"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Cloud sync</h2>
+      <div class="stack">
+        <label>URL <input type="text" id="syncUrl" placeholder="https://sync.example.com/ua"></label>
+        <label>API key <input type="text" id="syncKey" placeholder="optional"></label>
+        <label><input type="checkbox" id="syncEnabled"> Enable sync</label>
+        <label>Interval (min) <input type="number" id="syncInterval" value="10" min="0" max="1440" style="width:80px"></label>
+        <label><input type="checkbox" id="syncOnStartup"> Push on startup</label>
+        <label><input type="checkbox" id="syncOnSave"> Push on save</label>
+        <label><input type="checkbox" id="syncForce"> Force overwrite on pull</label>
+        <div class="mini">
+          <button id="syncPush" type="button">Push</button>
+          <button id="syncPull" type="button">Pull</button>
+        </div>
+        <div id="syncInfo" class="meta"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Presets</h2>
+      <div class="stack">
+        <div class="mini">
+          <input type="text" id="presetName" placeholder="Preset name" style="flex:1">
+          <button id="savePreset" type="button">Save current as preset</button>
+        </div>
+        <button id="exportPresets" type="button">Export presets</button>
+        <button id="loadPresetBtn" type="button">Load selected preset</button>
+        <button id="deletePreset" type="button">Delete selected</button>
+        <div id="presetsList" class="stack"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Settings</h2>
+      <div class="stack">
+        <label>Provider <input type="text" id="setProvider" placeholder="openai / anthropic / echo"></label>
+        <label>Model <input type="text" id="setModel" placeholder="gpt-5-mini"></label>
+        <label>Memory <input type="text" id="setMemory" placeholder="local / mem0"></label>
+        <label>Code cmd <input type="text" id="setCodeCmd" placeholder="claude -p"></label>
+        <label>Outlines model <input type="text" id="setOutlines" placeholder="HF model id"></label>
+        <label><input type="checkbox" id="setBrowser"> Browser enabled</label>
+        <button id="saveSettings" type="button">Save settings</button>
+        <div id="settingsPath" class="meta"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Export data</h2>
+      <div class="stack">
+        <button id="exportRuns" type="button">Export runs (JSON)</button>
+        <button id="exportMemories" type="button">Export memories (JSON)</button>
+        <button id="importMemories" type="button" onclick="document.getElementById('memoryUpload').click()">
+          Import memories
+          <input type="file" id="memoryUpload" accept=".json" style="display:none" onchange="importMemories(this.files[0])">
+        </button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Background tasks</h2>
+      <div class="mini">
+        <input type="text" id="bgTask" placeholder="Task description..." style="flex:1">
+        <select id="bgTool">
+          <option value="browse">Browser</option>
+          <option value="code">Code</option>
+        </select>
+        <button id="runBgTask" type="button">Run</button>
+      </div>
+      <div id="tasksList" class="stack" style="margin-top:10px"></div>
+    </div>
+    <div class="panel">
+      <h2>Model / runtime</h2>
+      <div id="runtimeInfo" class="stack"></div>
+    </div>
+  </aside>
+</div>
+<footer>
+  <input type="text" id="input" placeholder="Message…" autofocus>
+  <button id="send">Send</button>
+</footer>
+<script>
+const TOKEN = "__UA_TOKEN__";
+const H = { "Content-Type": "application/json", "X-UA-Token": TOKEN };
+const log = document.getElementById("log"), input = document.getElementById("input"),
+      sendBtn = document.getElementById("send"), personaSel = document.getElementById("persona"),
+      sessionEl = document.getElementById("session"), statusEl = document.getElementById("status"),
+      historyList = document.getElementById("historyList"), memoryList = document.getElementById("memoryList"),
+      runtimeInfo = document.getElementById("runtimeInfo"), memoryQuery = document.getElementById("memoryQuery"),
+      runsList = document.getElementById("runsList"), settingsPath = document.getElementById("settingsPath");
+
+function add(cls, text, extras) {
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
+  d.textContent = text;
+  (extras || []).forEach(([c, t]) => { const e = document.createElement("div"); e.className = c; e.textContent = t; d.appendChild(e); });
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+}
+
+function fillList(el, items, emptyText) {
+  el.innerHTML = "";
+  if (!items.length) {
+    const d = document.createElement("div");
+    d.className = "item";
+    d.textContent = emptyText;
+    el.appendChild(d);
+    return;
+  }
+  items.forEach(text => {
+    const d = document.createElement("div");
+    d.className = "item";
+    if (typeof text === "string") {
+      d.textContent = text;
+    } else {
+      d.innerHTML = `<small>${text.title}</small>${text.body}`;
+    }
+    el.appendChild(d);
+  });
+}
+
+async function getJson(url, method = "GET", body) {
+  const opts = { method, headers: H };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error(r.status + " " + (await r.text()));
+  return r.json();
+}
+
+async function refreshStatus() {
+  const st = await getJson("/api/status");
+  const model = st.components.find(s => s.component === "model");
+  statusEl.textContent = model ? model.detail : "";
+  runtimeInfo.innerHTML = "";
+  [
+    ["Provider", st.settings.provider],
+    ["User", st.settings.user_id || "(none)"],
+    ["Model", st.settings.model || "(none)"],
+    ["Memory", st.settings.memory_backend],
+    ["Browser", String(st.settings.browser_enabled)],
+    ["Code cmd", st.settings.code_cmd || "(none)"],
+    ["Host", st.settings.host],
+    ["Port", String(st.settings.port)],
+    ["Token", st.token ? "set" : "missing"],
+  ].forEach(([k, v]) => {
+    const d = document.createElement("div");
+    d.className = "item";
+    d.innerHTML = `<small>${k}</small>${v}`;
+    runtimeInfo.appendChild(d);
+  });
+  document.getElementById("setProvider").value = st.settings.provider || "";
+  document.getElementById("setModel").value = st.settings.model || "";
+  document.getElementById("setMemory").value = st.settings.memory_backend || "";
+  document.getElementById("setCodeCmd").value = st.settings.code_cmd || "";
+  document.getElementById("setOutlines").value = st.settings.outlines_model || "";
+  document.getElementById("setBrowser").checked = !!st.settings.browser_enabled;
+  settingsPath.textContent = st.config_path ? `Saved settings file: ${st.config_path}` : "";
+  return st;
+}
+
+async function refreshPersonas() {
+  const ps = await getJson("/api/personas");
+  const plist = Array.isArray(ps) ? ps : (ps.personas || ps.items || []);
+  personaSel.innerHTML = "";
+  personaSel.appendChild(new Option("Assistant (default)", ""));
+  plist.forEach(p => personaSel.appendChild(new Option(p.name, p.slug)));
+}
+
+async function refreshHistory() {
+  const s = encodeURIComponent(sessionEl.value.trim() || "default");
+  const hist = await getJson(`/api/history?session=${s}`);
+  const hlist = Array.isArray(hist) ? hist : (hist.items || hist.history || []);
+  fillList(historyList, hlist.map(m => `${m.role}: ${m.content}`), "No messages yet.");
+}
+
+async function refreshRuns() {
+  const s = encodeURIComponent(sessionEl.value.trim() || "default");
+  const runs = await getJson(`/api/runs?session=${s}`);
+  // runs may be array or {detail} on error; guard .map
+  const list = Array.isArray(runs) ? runs : (runs.runs || runs.items || []);
+  fillList(runsList, list.map(r => ({
+    title: `${new Date(r.ts * 1000).toLocaleString()} • ${r.persona}`,
+    body: `${r.user_text}\n→ ${r.reply}\n${r.tool_calls.map(t => `• ${t.action}: ${t.input}`).join("\n") || ""}`
+  })), "No runs yet.");
+}
+
+async function refreshMemories() {
+  const q = encodeURIComponent(memoryQuery.value.trim());
+  const mem = await getJson(`/api/memories?q=${q}`);
+  const mlist = Array.isArray(mem) ? mem : (mem.memories || mem.items || []);
+  fillList(memoryList, mlist, q ? "No matching memories." : "Type a query to search memories.");
+}
+
+async function refreshAll() {
+  try {
+    await Promise.all([refreshPersonas(), refreshStatus(), refreshHistory(), refreshRuns(), refreshMemories(), refreshTasks(), refreshUsers(), refreshPresets(), refreshSyncStatus()]);
+  } catch (e) {
+    add("", "Could not reach the local server: " + e);
+  }
+}
+
+async function send() {
+  const message = input.value.trim();
+  if (!message) return;
+  input.value = ""; sendBtn.disabled = true;
+  add("user", message);
+  try {
+    const data = await getJson("/api/chat", "POST", {
+      message,
+      session: sessionEl.value.trim() || "default",
+      persona: personaSel.value || null,
+      allow_tools: document.getElementById("tools").checked
+    });
+    const extras = [];
+    (data.tool_calls || []).forEach(c => extras.push(["tool", (c.approved ? "Used " : "Declined ") + c.action + ": " + c.input]));
+    if ((data.memories || []).length) extras.push(["meta", "Remembered: " + (data.memories || []).join(" • ")]);
+    add("", data.text, extras);
+    await Promise.all([refreshHistory(), refreshRuns(), refreshMemories(), refreshStatus()]);
+  } catch (e) { add("", "Error: " + e.message); }
+  sendBtn.disabled = false; input.focus();
+}
+
+async function saveSettings() {
+  const data = await getJson("/api/settings", "PATCH", {
+    provider: document.getElementById("setProvider").value.trim() || null,
+    model: document.getElementById("setModel").value.trim() || null,
+    memory_backend: document.getElementById("setMemory").value.trim() || null,
+    browser_enabled: document.getElementById("setBrowser").checked,
+    code_cmd: document.getElementById("setCodeCmd").value.trim() || null,
+    outlines_model: document.getElementById("setOutlines").value.trim() || null,
+  });
+  settingsPath.textContent = `Saved settings file: ${data.config_path}`;
+  await refreshStatus();
+}
+
+// Export / import runs and memories
+document.getElementById("exportRuns").onclick = exportRuns;
+document.getElementById("exportMemories").onclick = exportMemories;
+// memoryUpload input has onchange="handleImportMemories(this.files[0])"
+
+// --- users ---
+document.getElementById("refreshUsers").onclick = refreshUsers;
+document.getElementById("createUser").onclick = createUser;
+
+// --- presets ---
+document.getElementById("savePreset").onclick = savePreset;
+document.getElementById("exportPresets").onclick = exportPresets;
+document.getElementById("loadPresetBtn").onclick = applySelectedPreset;
+document.getElementById("deletePreset").onclick = deleteSelectedPreset;
+
+// --- cloud sync buttons ---
+document.getElementById("syncPush").onclick = async () => {
+  const url = document.getElementById("syncUrl").value.trim();
+  const key = document.getElementById("syncKey").value.trim();
+  const enabled = document.getElementById("syncEnabled").checked;
+  const interval = parseInt(document.getElementById("syncInterval").value || "0", 10);
+  const onStartup = document.getElementById("syncOnStartup").checked;
+  const onSave = document.getElementById("syncOnSave").checked;
+  const force = document.getElementById("syncForce").checked;
+  await getJson("/api/settings", "PATCH", {
+    cloud_sync_url: url || null,
+    cloud_sync_api_key: key || null,
+    cloud_sync_enabled: enabled,
+    sync_interval: interval,
+    sync_on_startup: onStartup,
+    sync_on_save: onSave,
+    sync_force_overwrite: force,
+  });
+  try {
+    await getJson("/api/sync/push", "POST", {});
+    document.getElementById("syncInfo").textContent = "Push ok";
+  } catch (e) {
+    document.getElementById("syncInfo").textContent = "Push failed: " + e.message;
+  }
+};
+
+document.getElementById("syncPull").onclick = async () => {
+  const url = document.getElementById("syncUrl").value.trim();
+  const key = document.getElementById("syncKey").value.trim();
+  const enabled = document.getElementById("syncEnabled").checked;
+  const interval = parseInt(document.getElementById("syncInterval").value || "0", 10);
+  const onStartup = document.getElementById("syncOnStartup").checked;
+  const onSave = document.getElementById("syncOnSave").checked;
+  const force = document.getElementById("syncForce").checked;
+  await getJson("/api/settings", "PATCH", {
+    cloud_sync_url: url || null,
+    cloud_sync_api_key: key || null,
+    cloud_sync_enabled: enabled,
+    sync_interval: interval,
+    sync_on_startup: onStartup,
+    sync_on_save: onSave,
+    sync_force_overwrite: force,
+  });
+  try {
+    const path = force ? "/api/sync/pull?force=true" : "/api/sync/pull";
+    await getJson(path, "POST", {});
+    document.getElementById("syncInfo").textContent = "Pull ok";
+  } catch (e) {
+    document.getElementById("syncInfo").textContent = "Pull failed: " + e.message;
+  }
+};
+
+async function refreshSyncStatus() {
+  try {
+    const st = await getJson("/api/sync/status");
+    const el = document.getElementById("syncInfo");
+    if (!st.enabled) {
+      el.textContent = "Sync disabled";
+      return;
+    }
+    const last = st.last_sync ? new Date(st.last_sync * 1000).toLocaleTimeString() : "never";
+    const next = st.next_sync ? new Date(st.next_sync * 1000).toLocaleTimeString() : "—";
+    el.textContent = `Enabled • interval ${st.interval}m • last ${last} • next ${next}`;
+  } catch (e) {}
+}
+
+
+// Background tasks
+document.getElementById("runBgTask").onclick = runBgTask;
+
+let selectedPresetId = null;
+
+async function refreshUsers() {
+  try {
+    const users = await getJson("/api/users");
+    const ulist = Array.isArray(users) ? users : (users.users || users.items || []);
+    fillList(document.getElementById("usersList"), ulist.map(u => u.user_id), "No users yet.");
+  } catch (e) {}
+}
+
+async function createUser() {
+  const user_id = document.getElementById("newUserId").value.trim();
+  const password = document.getElementById("newUserPw").value.trim();
+  if (!user_id || !password) return add("", "User ID and password required.");
+  try {
+    await getJson("/api/users", "POST", { user_id, password });
+    add("", "User created.");
+    refreshUsers();
+  } catch (e) { add("", e.message); }
+}
+
+async function savePreset() {
+  const name = document.getElementById("presetName").value.trim();
+  if (!name) return add("", "Preset name required.");
+  const currentSettings = getCurrentSettings();
+  await getJson("/api/presets", "POST", { name, description: "", settings: currentSettings });
+  refreshPresets();
+}
+
+function getCurrentSettings() {
+  return {
+    provider: document.getElementById("setProvider").value,
+    model: document.getElementById("setModel").value,
+    memory_backend: document.getElementById("setMemory").value,
+    browser_enabled: document.getElementById("setBrowser").checked,
+    code_cmd: document.getElementById("setCodeCmd").value,
+    outlines_model: document.getElementById("setOutlines").value,
+  };
+}
+
+async function refreshPresets() {
+  try {
+    const presets = await getJson("/api/presets");
+    const el = document.getElementById("presetsList");
+    const plist = Array.isArray(presets) ? presets : (presets.presets || presets.items || []);
+    fillList(el, plist.map(p => ({
+      title: p.name,
+      body: JSON.stringify(p.settings || {}, null, 2)
+    })), "No presets yet.");
+    if (plist.length) selectedPresetId = plist[0].id;
+  } catch (e) {}
+}
+
+function exportPresets() {
+  fetch("/api/presets", { headers: H })
+    .then(r => r.json())
+    .then(p => {
+      const blob = new Blob([JSON.stringify(p, null, 2)], {type: "application/json"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "ua_presets_export.json";
+      a.click();
+    });
+}
+
+async function applySelectedPreset() {
+  if (!selectedPresetId) return add("", "No preset selected.");
+  const presets = await getJson("/api/presets");
+  const sel = presets.find(p => p.id === selectedPresetId);
+  if (!sel) return add("", "Preset not found.");
+  await getJson("/api/settings", "PATCH", sel.settings);
+  add("", "Preset loaded.");
+  refreshStatus();
+}
+
+async function deleteSelectedPreset() {
+  if (!selectedPresetId) return;
+  await getJson(`/api/presets/${selectedPresetId}`, "DELETE");
+  refreshPresets();
+}
+
+async function runBgTask() {
+  const task = document.getElementById("bgTask").value.trim();
+  const tool = document.getElementById("bgTool").value;
+  if (!task) return add("", "Enter a task description first.");
+  try {
+    const data = await getJson("/api/tasks", "POST", { task, tool });
+    add("", `Task submitted (${data.task_id})`);
+    refreshTasks();
+  } catch (e) {
+    add("", "Error: " + e.message);
+  }
+}
+
+async function refreshTasks() {
+  try {
+    const tasks = await getJson("/api/tasks");
+    const el = document.getElementById("tasksList");
+    const tlist = Array.isArray(tasks) ? tasks : (tasks.tasks || tasks.items || []);
+    fillList(el, tlist.map(t => ({
+      title: `${t.id} • ${t.status}`,
+      body: `${t.name}\n${t.result ? "Result: " + t.result : ""}\n${t.error ? "Error: " + t.error : ""}`
+    })), "No background tasks yet.");
+  } catch (e) {}
+}
+
+async function exportRuns() {
+  const res = await fetch("/api/export/runs");
+  const data = await res.json();
+  const blob = new Blob([data.content], {type: data.mime});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = data.filename;
+  a.click();
+}
+
+async function exportMemories() {
+  const res = await fetch("/api/export/memories");
+  const data = await res.json();
+  const blob = new Blob([data.content], {type: data.mime});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = data.filename;
+  a.click();
+}
+
+function importMemories(file) {
+  if (!file) return;
+  const formData = new FormData();
+  formData.append("file", file);
+  fetch("/api/import/memories", {
+    method: "POST",
+    headers: {"X-UA-Token": TOKEN},
+    body: formData
+  })
+  .then(r => r.json())
+  .then(data => {
+    console.log("Import result:", data);
+    add("", "Memory import complete");
+  })
+  .catch(err => {
+    console.error("Import error:", err);
+    add("", "Import error: " + err);
+  });
+}
+
+sendBtn.onclick = send;
+document.getElementById("refresh").onclick = refreshAll;
+document.getElementById("searchMemories").onclick = refreshMemories;
+document.getElementById("saveSettings").onclick = saveSettings;
+input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+memoryQuery.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); refreshMemories(); } });
+sessionEl.addEventListener("change", refreshAll);
+refreshAll();
+</script>
+</body>
+</html>
