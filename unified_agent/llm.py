@@ -43,15 +43,19 @@ class OpenAILLM:
             import openai
         except ImportError as e:  # pragma: no cover
             raise LLMUnavailable("pip install 'unified-agent[openai]'") from e
-        # Local servers usually ignore the key but the SDK insists on one.
-        kwargs = {"base_url": base_url, "api_key": "not-needed"} if base_url else {}
-        self._client = openai.OpenAI(**kwargs)
+        # OmniRoute requires a real key; local servers ignore it but SDK insists on one.
+        import os
+        api_key = os.environ.get("OPENAI_API_KEY") or "not-needed"
+        kwargs = {"base_url": base_url, "api_key": api_key} if base_url else {"api_key": api_key}
+        self._base_url = base_url
         self._model = model
+        self._client = openai.OpenAI(**kwargs)
 
     def complete(self, system: str, messages: list[Message]) -> str:
         resp = self._client.chat.completions.create(
             model=self._model,
             messages=[{"role": "system", "content": system}, *messages],
+            temperature=0.0,
         )
         return resp.choices[0].message.content or ""
 

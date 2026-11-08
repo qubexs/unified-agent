@@ -169,7 +169,16 @@ class Agent:
                     self.llm, system, convo, Decision, outlines_gen=self._outlines_gen()
                 )
             except ValueError as e:
-                final = f"(I couldn't produce a valid response: {e})"
+                # One last fallback: ask the model in plain text to explain
+                # what it was trying to do, so the user still gets something.
+                # (Happens when the gateway truncates JSON mid-way.)
+                try:
+                    raw = self.llm.complete(system, convo)
+                    final = raw.strip()[:2000] if raw.strip() else f"(I couldn't produce a valid response: {e})"
+                    if final.startswith("{"):
+                        final = f"(I couldn't produce a valid response: {e})\n\nRaw model output:\n{final}"
+                except Exception:
+                    final = f"(I couldn't produce a valid response: {e})"
                 break
 
             if d.action == "answer" or d.action not in self.available_tools():
